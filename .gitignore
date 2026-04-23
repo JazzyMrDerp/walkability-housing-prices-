@@ -1,0 +1,8 @@
+# Large data files - too big for GitHub
+data/zillow.csv
+
+__pycache__/
+*.py[cod]
+.venv/
+
+.idea/
