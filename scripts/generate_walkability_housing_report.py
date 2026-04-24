@@ -17,6 +17,7 @@ import seaborn as sns
 from matplotlib.backends.backend_pdf import PdfPages
 from scipy import stats
 from sklearn.linear_model import LinearRegression
+import matplotlib.ticker as mticker
 
 # Project root (parent of scripts/)
 ROOT = Path(__file__).resolve().parents[1]
@@ -182,9 +183,10 @@ def add_summary_table_page(pdf: PdfPages, desc: pd.DataFrame) -> None:
     plt.close(fig)
 
 
-def plot_scatter_hex(df: pd.DataFrame, pdf: PdfPages) -> None:
+def plot_scatter(df: pd.DataFrame, pdf: PdfPages) -> None:
+    import matplotlib.ticker as mticker
     sns.set_theme(style="whitegrid", context="notebook")
-    fig, axes = plt.subplots(1, 2, figsize=(FIG_W, FIG_H))
+    fig, ax = plt.subplots(figsize=(FIG_W, FIG_H))
 
     sns.scatterplot(
         data=df.sample(min(8000, len(df)), random_state=42),
@@ -192,14 +194,30 @@ def plot_scatter_hex(df: pd.DataFrame, pdf: PdfPages) -> None:
         y="home_value",
         alpha=0.25,
         s=12,
-        ax=axes[0],
+        ax=ax,
         color="#2c7fb8",
     )
-    axes[0].set_title("Walk score vs. typical home value (random subsample)")
-    axes[0].set_xlabel("National Walkability Index (higher = more walkable)")
-    axes[0].set_ylabel("Typical home value ($)")
+    ax.set_title("Walk Score vs. Typical Home Value (random subsample)")
+    ax.set_xlabel("National Walkability Index (higher = more walkable)")
+    ax.set_ylabel("Typical home value ($)")
+    ax.set_xlim(0, 17)
 
-    hb = axes[1].hexbin(
+    dollar_fmt = mticker.FuncFormatter(
+        lambda x, _: f"${x/1_000_000:.1f}M" if x >= 1_000_000 else f"${x/1000:.0f}k"
+    )
+    ax.yaxis.set_major_formatter(dollar_fmt)
+
+    plt.tight_layout()
+    pdf.savefig(fig, bbox_inches="tight")
+    plt.close(fig)
+
+
+def plot_hex(df: pd.DataFrame, pdf: PdfPages) -> None:
+    import matplotlib.ticker as mticker
+    sns.set_theme(style="whitegrid", context="notebook")
+    fig, ax = plt.subplots(figsize=(FIG_W, FIG_H))
+
+    hb = ax.hexbin(
         df["NatWalkInd"],
         df["home_value"],
         gridsize=45,
@@ -207,14 +225,20 @@ def plot_scatter_hex(df: pd.DataFrame, pdf: PdfPages) -> None:
         mincnt=1,
         bins="log",
     )
-    axes[1].set_title("Density of ZIPs (darker = more ZIPs)")
-    axes[1].set_xlabel("National Walkability Index")
-    axes[1].set_ylabel("Typical home value ($)")
-    plt.colorbar(hb, ax=axes[1], label="log(count)")
+    ax.set_title("Density of ZIP Codes (darker = more ZIPs)")
+    ax.set_xlabel("National Walkability Index")
+    ax.set_ylabel("Typical home value ($)")
+    ax.set_xlim(2, 17)
+    plt.colorbar(hb, ax=ax, label="log(count)")
+
+    dollar_fmt = mticker.FuncFormatter(
+        lambda x, _: f"${x/1_000_000:.1f}M" if x >= 1_000_000 else f"${x/1000:.0f}k"
+    )
+    ax.yaxis.set_major_formatter(dollar_fmt)
+
     plt.tight_layout()
     pdf.savefig(fig, bbox_inches="tight")
     plt.close(fig)
-
 
 def plot_state_bars(state_df: pd.DataFrame, pdf: PdfPages) -> None:
     top = state_df.nlargest(15, "mean_walk")
@@ -230,6 +254,8 @@ def plot_state_bars(state_df: pd.DataFrame, pdf: PdfPages) -> None:
         palette="crest",
         legend=False,
     )
+    axes[0].set_xlim(0, 16)  # Force same scale
+    axes[1].set_xlim(0, 16)  # Force same scale
     axes[0].set_title("States with highest mean ZIP walk scores")
     axes[0].set_xlabel("Mean walkability index")
 
@@ -339,7 +365,8 @@ def main() -> int:
     with PdfPages(pdf_path) as pdf:
         add_title_page(pdf, log, len(df))
         add_summary_table_page(pdf, desc)
-        plot_scatter_hex(df, pdf)
+        plot_scatter(df, pdf)
+        plot_hex(df, pdf)
         plot_state_bars(state_df, pdf)
         plot_state_walk_vs_price(state_df, pdf)
         plot_residuals(df, pdf)
